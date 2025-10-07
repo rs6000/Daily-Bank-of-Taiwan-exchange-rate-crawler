@@ -36,7 +36,7 @@ jobs:
       # 4. 執行爬蟲程式
       - name: Run Crawler and Generate JSON
         # 執行您的 Python 檔案
-        run: python crawler_bot.py
+        run: python Exhange-Rates-Gemini.py
         
       # 5. 自動提交和推送變更
       - name: Commit and Push new data
