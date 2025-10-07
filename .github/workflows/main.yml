@@ -14,33 +14,33 @@ jobs:
   update-rates:
     runs-on: ubuntu-latest
     
+    # *** 關鍵修正：授予 Action 寫入 (write) 權限，以解決 Permission denied 錯誤 ***
+    permissions:
+      contents: write 
+    
     steps:
       # 1. 檢查程式碼
       - name: Checkout repository code
         uses: actions/checkout@v4
-        # 關鍵：使用 GITHUB_TOKEN 讓 Action 有權限提交回儲存庫
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }} 
-
+        # 由於頂層已經設定了 permissions: contents: write，這裡不需要額外的 token 參數
+        
       # 2. 設定 Python 環境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x' 
 
-      # 3. 安裝爬蟲所需的依賴
-      - name: Install dependencies (pandas, html5lib, pytz)
-        # 確保安裝了所有必要的函式庫來執行 crawler_bot.py
+      # 3. 安裝爬蟲所需的依賴 (包含 lxml, pytz)
+      - name: Install dependencies (pandas, html5lib, pytz, lxml)
         run: pip install pandas html5lib pytz lxml
         
       # 4. 執行爬蟲程式
       - name: Run Crawler and Generate JSON
-        # 執行您的 Python 檔案
+        # *** 請確保這裡的檔案名稱與您實際使用的 Python 檔案名稱一致 ***
         run: python Exhange-Rates-Gemini.py
         
       # 5. 自動提交和推送變更
       - name: Commit and Push new data
-        # 使用專門用於自動提交的 Action
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           # 只提交生成的 JSON 檔案
