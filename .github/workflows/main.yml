@@ -31,7 +31,7 @@ jobs:
       # 3. 安裝爬蟲所需的依賴
       - name: Install dependencies (pandas, html5lib, pytz)
         # 確保安裝了所有必要的函式庫來執行 crawler_bot.py
-        run: pip install pandas html5lib pytz
+        run: pip install pandas html5lib pytz lxml
         
       # 4. 執行爬蟲程式
       - name: Run Crawler and Generate JSON
