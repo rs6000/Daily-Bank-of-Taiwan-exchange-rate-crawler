@@ -4,12 +4,12 @@ from datetime import datetime, UTC
 import sys
 import os
 import pytz
-import logging # <-- 新增：導入 logging 模組
+import logging 
 
 # --- 設定 ---
 URL = "https://rate.bot.com.tw/xrt?Lang=zh-TW"
 OUTPUT_FILE = "data/history.json" 
-LOG_FILE = "data/app.log" # <-- 新增：日誌檔案路徑
+LOG_FILE = "data/app.log" 
 SOURCE_NAME = "Bank of Taiwan (BOT)"
 BASE_CURRENCY = "TWD"
 
@@ -17,35 +17,30 @@ BASE_CURRENCY = "TWD"
 # 確保 data 資料夾存在 (log 和 json 都會放在這裡)
 os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True) 
 
-# 配置日誌格式：時間, 日誌級別, 訊息
+# 配置日誌格式：時間, 日誌級別, 訊息 (同時輸出到檔案和控制台)
 logging.basicConfig(
-    level=logging.INFO, # 設定最低紀錄等級為 INFO
+    level=logging.INFO, 
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(LOG_FILE, encoding='utf-8'), # 輸出到檔案
-        logging.StreamHandler(sys.stdout) # 同時輸出到控制台 (stdout)
+        logging.FileHandler(LOG_FILE, encoding='utf-8'), 
+        logging.StreamHandler(sys.stdout) 
     ]
 )
 logger = logging.getLogger(__name__)
 
 def fetch_and_process_rates():
-    """
-    從台灣銀行網頁爬取匯率並處理成結構化數據。
-    """
+    """從台灣銀行網頁爬取匯率並處理成結構化數據。"""
     logger.info(f"--- 開始執行爬蟲：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
     logger.info(f"Fetching data from {SOURCE_NAME}...")
     
     try:
-        # 使用 read_html 讀取網頁表格
         dfs = pd.read_html(URL, encoding='utf-8')
         currency = dfs[0]
         logger.info("Successfully fetched HTML content.")
     except Exception as e:
-        # 使用 error 紀錄錯誤
         logger.error(f"Error fetching or parsing HTML: {e}")
         return None
 
-    # --- 數據清洗與轉換 ---
     try:
         currency_fix = currency.iloc[:, [0, 1, 2]].copy()
         currency_fix.columns = [u'幣別', u'即期買入', u'即期賣出']
@@ -66,9 +61,7 @@ def fetch_and_process_rates():
 
 
 def save_to_history(new_daily_data):
-    """
-    讀取舊的歷史數據，新增當日資料，然後存回檔案。
-    """
+    """讀取舊的歷史數據，新增當日資料，然後存回檔案。"""
     # 設置時間
     utc_now = datetime.now(UTC) 
     taipei_tz = pytz.timezone('Asia/Taipei')
@@ -119,7 +112,7 @@ if __name__ == "__main__":
     daily_rates = fetch_and_process_rates()
     
     if daily_rates:
-        # 這裡的 print 用於 GitHub Actions log 的預覽，保持不變
+        # 輸出預覽到 Actions log
         print("\n--- JSON Data Output Preview (中文顯示) ---")
         json_preview = json.dumps(
             daily_rates, 
@@ -131,6 +124,8 @@ if __name__ == "__main__":
         save_to_history(daily_rates)
         logger.info(f"--- 程式執行結束。結果已儲存於 {OUTPUT_FILE} 及 {LOG_FILE} ---")
     else:
-        # 爬取失敗的退出
         logger.error("Failed to fetch or process rate data. Exiting with error code 1.")
         sys.exit(1)
+        
+    # 關鍵：強制關閉日誌系統，確保 app.log 寫入完成
+    logging.shutdown()
