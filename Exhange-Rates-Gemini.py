@@ -9,7 +9,7 @@ import logging
 # --- 設定 ---
 URL = "https://rate.bot.com.tw/xrt?Lang=zh-TW"
 OUTPUT_FILE = "data/history.json" 
-LOG_FILE = "data/app.log" 
+LOG_FILE = "data/app.log" # 日誌檔案路徑
 SOURCE_NAME = "Bank of Taiwan (BOT)"
 BASE_CURRENCY = "TWD"
 
@@ -34,6 +34,7 @@ def fetch_and_process_rates():
     logger.info(f"Fetching data from {SOURCE_NAME}...")
     
     try:
+        # 使用 read_html 讀取網頁表格
         dfs = pd.read_html(URL, encoding='utf-8')
         currency = dfs[0]
         logger.info("Successfully fetched HTML content.")
@@ -42,6 +43,7 @@ def fetch_and_process_rates():
         return None
 
     try:
+        # 數據清洗與轉換邏輯
         currency_fix = currency.iloc[:, [0, 1, 2]].copy()
         currency_fix.columns = [u'幣別', u'即期買入', u'即期賣出']
         currency_fix[u'幣別'] = currency_fix[u'幣別'].str.extract(r'\((\w+)\)')
@@ -62,7 +64,7 @@ def fetch_and_process_rates():
 
 def save_to_history(new_daily_data):
     """讀取舊的歷史數據，新增當日資料，然後存回檔案。"""
-    # 設置時間
+    # 設置時間並轉換為台北時區
     utc_now = datetime.now(UTC) 
     taipei_tz = pytz.timezone('Asia/Taipei')
     taipei_now = utc_now.astimezone(taipei_tz)
@@ -127,5 +129,8 @@ if __name__ == "__main__":
         logger.error("Failed to fetch or process rate data. Exiting with error code 1.")
         sys.exit(1)
         
-    # 關鍵：強制關閉日誌系統，確保 app.log 寫入完成
+    # *** 最終解決方案：強制刷新所有日誌處理器，確保 app.log 寫入完成 ***
+    for handler in logger.handlers:
+        handler.flush()
+        
     logging.shutdown()
