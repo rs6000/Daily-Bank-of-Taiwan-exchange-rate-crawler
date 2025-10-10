@@ -1,106 +1,136 @@
 import pandas as pd
 import json
-from datetime import datetime, UTC # <-- 新增導入 UTC
+from datetime import datetime, UTC
 import sys
 import os
-import pytz # 用於處理時區轉換
+import pytz
+import logging # <-- 新增：導入 logging 模組
 
 # --- 設定 ---
 URL = "https://rate.bot.com.tw/xrt?Lang=zh-TW"
-OUTPUT_FILE = "data/rates.json"
+OUTPUT_FILE = "data/history.json" 
+LOG_FILE = "data/app.log" # <-- 新增：日誌檔案路徑
 SOURCE_NAME = "Bank of Taiwan (BOT)"
-BASE_CURRENCY = "TWD" # 數據以新台幣為基礎
+BASE_CURRENCY = "TWD"
+
+# --- 日誌配置 ---
+# 確保 data 資料夾存在 (log 和 json 都會放在這裡)
+os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True) 
+
+# 配置日誌格式：時間, 日誌級別, 訊息
+logging.basicConfig(
+    level=logging.INFO, # 設定最低紀錄等級為 INFO
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding='utf-8'), # 輸出到檔案
+        logging.StreamHandler(sys.stdout) # 同時輸出到控制台 (stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 def fetch_and_process_rates():
     """
     從台灣銀行網頁爬取匯率並處理成結構化數據。
     """
-    print(f"Fetching data from {SOURCE_NAME}...")
+    logger.info(f"--- 開始執行爬蟲：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
+    logger.info(f"Fetching data from {SOURCE_NAME}...")
     
     try:
-        # 讀取網頁：pd.read_html 會返回網頁中所有表格的 DataFrame 列表
+        # 使用 read_html 讀取網頁表格
         dfs = pd.read_html(URL, encoding='utf-8')
         currency = dfs[0]
+        logger.info("Successfully fetched HTML content.")
     except Exception as e:
-        print(f"Error fetching or parsing HTML: {e}", file=sys.stderr)
+        # 使用 error 紀錄錯誤
+        logger.error(f"Error fetching or parsing HTML: {e}")
         return None
 
-    # 1. 擷取需要的欄位 (幣別/即期買入/即期賣出)
-    # 修正警告：使用 .copy() 確保 currency_fix 是一個獨立的 DataFrame 副本
-    currency_fix = currency.iloc[:, [0, 1, 2]].copy() 
-    currency_fix.columns = [u'幣別', u'即期買入', u'即期賣出']
+    # --- 數據清洗與轉換 ---
+    try:
+        currency_fix = currency.iloc[:, [0, 1, 2]].copy()
+        currency_fix.columns = [u'幣別', u'即期買入', u'即期賣出']
+        currency_fix[u'幣別'] = currency_fix[u'幣別'].str.extract(r'\((\w+)\)')
+        currency_final = currency_fix[
+            (currency_fix[u'即期買入'] != '-') & (currency_fix[u'即期賣出'] != '-')
+        ].reset_index(drop=True)
+        
+        # 轉換為以幣別為鍵的字典結構
+        daily_rates_data = currency_final.set_index(u'幣別').T.to_dict()
+        logger.info(f"Data processed. Found {len(daily_rates_data)} valid currency rates.")
+        
+        return daily_rates_data
+    
+    except Exception as e:
+        logger.error(f"Error during data processing: {e}")
+        return None
 
-    # 2. 清除幣別欄重複字元，提取括號內的幣別代碼
-    # 由於上面使用了 .copy()，這裡的賦值操作不會再觸發 SettingWithCopyWarning
-    currency_fix[u'幣別'] = currency_fix[u'幣別'].str.extract(r'\((\w+)\)')
 
-    # 3. 過濾掉有空值或無效值 ('-') 的紀錄
-    currency_final = currency_fix[
-        (currency_fix[u'即期買入'] != '-') & (currency_fix[u'即期賣出'] != '-')
-    ].reset_index(drop=True)
-    
-    # --- 轉換為 JSON 結構 ---
-    
-    # 設置爬取時間 - 轉換成台北時區 (Asia/Taipei, GMT+8)
-    
-    # 修正棄用警告：使用 datetime.now(UTC) 取得時區感知 (timezone-aware) 的 UTC 時間
+def save_to_history(new_daily_data):
+    """
+    讀取舊的歷史數據，新增當日資料，然後存回檔案。
+    """
+    # 設置時間
     utc_now = datetime.now(UTC) 
     taipei_tz = pytz.timezone('Asia/Taipei')
     taipei_now = utc_now.astimezone(taipei_tz)
     
-    # 格式化為 ISO 8601 字符串 (包含 +08:00 資訊)
-    current_time_taipei = taipei_now.isoformat()
+    date_key = taipei_now.strftime('%Y-%m-%d')
+    time_string = taipei_now.isoformat()
     
-    # 將 DataFrame 轉換為適合 API 的字典列表
-    rates_list = currency_final.to_dict(orient='records')
+    # 1. 嘗試讀取現有的歷史檔案
+    history_data = {}
+    logger.info(f"Attempting to read existing file: {OUTPUT_FILE}")
+    if os.path.exists(OUTPUT_FILE):
+        try:
+            with open(OUTPUT_FILE, 'r', encoding='utf-8') as f:
+                history_data = json.load(f)
+            logger.info("Existing history file loaded successfully.")
+        except json.JSONDecodeError:
+            logger.warning("Existing history file is corrupted (JSONDecodeError). Starting a new history.")
+        except FileNotFoundError:
+            pass 
     
-    # 建立最終的 JSON 物件
-    final_data = {
-        "base_currency": BASE_CURRENCY,
-        "date_fetched_taipei": current_time_taipei, 
-        "source": SOURCE_NAME,
-        "rates": rates_list
-    }
-    
-    return final_data
+    # 2. 初始化頂層結構
+    if 'history' not in history_data:
+        history_data['base_currency'] = BASE_CURRENCY
+        history_data['source'] = SOURCE_NAME
+        history_data['history'] = {}
+        logger.info("Initialized new history structure.")
 
-def save_to_json(data):
-    """
-    將資料儲存為 JSON 檔案。
-    """
+    # 3. 插入新的每日數據
+    if new_daily_data:
+        history_data['history'][date_key] = new_daily_data
+        history_data['last_updated_taipei'] = time_string
+        logger.info(f"Inserted new rates for date: {date_key}. Total dates in history: {len(history_data['history'])}.")
+        
     try:
-        # 確保 data 資料夾存在
-        os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-        
+        # 4. 寫回檔案
         with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-            # 確保寫入檔案時，中文不會被編碼成 \uXXXX
-            json.dump(data, f, ensure_ascii=False, indent=4)
+            json.dump(history_data, f, ensure_ascii=False, indent=4)
         
-        print(f"Successfully saved data to {OUTPUT_FILE}")
+        logger.info(f"Successfully wrote data to {OUTPUT_FILE}")
         
     except Exception as e:
-        print(f"Error saving file: {e}", file=sys.stderr)
+        logger.error(f"Error saving file: {e}")
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    rate_data = fetch_and_process_rates()
+    daily_rates = fetch_and_process_rates()
     
-    if rate_data and rate_data['rates']:
+    if daily_rates:
+        # 這裡的 print 用於 GitHub Actions log 的預覽，保持不變
         print("\n--- JSON Data Output Preview (中文顯示) ---")
-        
-        # 輸出到終端機時，也要指定 ensure_ascii=False 才能正確顯示中文
         json_preview = json.dumps(
-            rate_data, 
+            daily_rates, 
             indent=4, 
             ensure_ascii=False 
         )
-        
-        # 為了避免輸出過長，只印出開頭 500 個字符
         print(json_preview[:500] + "\n...") 
         
-        save_to_json(rate_data)
+        save_to_history(daily_rates)
+        logger.info(f"--- 程式執行結束。結果已儲存於 {OUTPUT_FILE} 及 {LOG_FILE} ---")
     else:
-        # 如果爬取失敗，以錯誤狀態碼 (1) 退出，讓 GitHub Action 報告失敗
-        print("Failed to fetch or process rate data. Exiting.", file=sys.stderr)
+        # 爬取失敗的退出
+        logger.error("Failed to fetch or process rate data. Exiting with error code 1.")
         sys.exit(1)
