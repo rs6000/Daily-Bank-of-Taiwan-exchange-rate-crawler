@@ -22,7 +22,6 @@ jobs:
       # 1. 檢查程式碼
       - name: Checkout repository code
         uses: actions/checkout@v4
-        # 由於頂層已經設定了 permissions: contents: write，這裡不需要額外的 token 參數
         
       # 2. 設定 Python 環境
       - name: Set up Python
@@ -34,19 +33,21 @@ jobs:
       - name: Install dependencies (pandas, html5lib, pytz, lxml)
         run: pip install pandas html5lib pytz lxml
         
-      # 4. 執行爬蟲程式
-      - name: Run Crawler and Generate JSON
-        # *** 請確保這裡的檔案名稱與您實際使用的 Python 檔案名稱一致 ***
+      # 4. 執行爬蟲程式 (產生 history.json 和 app.log)
+      - name: Run Crawler and Generate History Data and Log
+        # 確保這裡的檔案名稱與您實際使用的 Python 檔案名稱一致
         run: python Exhange-Rates-Gemini.py
         
       # 5. 自動提交和推送變更
-      - name: Commit and Push new data
+      - name: Commit and Push new data and log files
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          # 只提交生成的 JSON 檔案
-          file_pattern: 'data/rates.json'
-          # 提交訊息
-          commit_message: '🤖 Daily BOT Rate Update (TPE Time): ${{ github.event.repository.name }}'
+          # *** 最終修正：使用 'data/*' 提交 history.json 和 app.log ***
+          file_pattern: 'data/*'
+          
+          # 修正提交訊息
+          commit_message: '🤖 Daily BOT History Update & Log: ${{ github.event.repository.name }}'
+          
           # 設置提交者的名稱和郵件地址
           commit_user_name: 'GitHub Action Bot' 
           commit_user_email: 'action@github.com'
