@@ -69,14 +69,19 @@ def save_to_history(new_daily_data):
     
     # 2. 初始化頂層結構
     if 'history' not in history_data:
+        # *** 修正：將所有頂層鍵依序初始化 ***
         history_data['base_currency'] = BASE_CURRENCY
         history_data['source'] = SOURCE_NAME
-        history_data['history'] = {}
+        history_data['last_updated_taipei'] = time_string # 確保它在 history 之前
+        history_data['history'] = {} 
+   
 
     # 3. 插入新的每日數據
     if new_daily_data:
+        # 更新 last_updated_taipei 的值，而不是重新插入
+        history_data['last_updated_taipei'] = time_string 
         history_data['history'][date_key] = new_daily_data
-        history_data['last_updated_taipei'] = time_string
+        
         
     try:
         # 4. 寫回檔案
