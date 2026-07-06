@@ -1,0 +1,221 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, ChevronDown, Award, Users, BookOpen } from 'lucide-react';
+
+// --- 1. 模擬數據 (Simulation of your JSON output) ---
+// 這裡模擬您的 Python 腳本輸出的 JSON 結構。
+const MOCK_CONTESTANTS_DATA = {
+    "it 鐵人賽 2024 年 - 參賽名單": {
+        "總參賽人數_所有組別": 1087,
+        "總分頁數": 109,
+        "主題組別_下拉選單": [
+            { "主題名稱": "Modern Web", "連結值": "web" },
+            { "主題名稱": "DevOps", "連結值": "devops" },
+            { "主題名稱": "資料分析", "連結值": "data" },
+            { "主題名稱": "其他", "連結值": "other" },
+        ],
+        "參賽者名單_完整列表": [
+            { "年度": 2024, "頁碼": 1, "報名日期": "2024-06-25 15:00", "主題": "Modern Web", "參賽者名稱": "程式碼大師", "圖像URL": "https://placehold.co/150x150/003d66/ffffff?text=P1", "題目": "深入理解 React 狀態管理", "題目簡介": "從 useState 到 Redux/Zustand 的深度剖析與實戰。", "進度": "已繳交 12 篇" },
+            { "年度": 2024, "頁碼": 1, "報名日期": "2024-07-01 10:20", "主題": "DevOps", "參賽者名稱": "雲端工程師", "圖像URL": "https://placehold.co/150x150/003d66/ffffff?text=P2", "題目": "從零開始建立 CI/CD Pipeline", "題目簡介": "使用 GitHub Actions 和 AWS 部署微服務。", "進度": "已繳交 1 篇" },
+            { "年度": 2024, "頁碼": 2, "報名日期": "2024-06-28 09:00", "主題": "資料分析", "參賽者名稱": "數據專家", "圖像URL": "https://placehold.co/150x150/003d66/ffffff?text=P3", "題目": "Python Pandas 資料清洗與視覺化", "題目簡介": "利用 Matplotlib 和 Seaborn 進行數據探索。", "進度": "已繳交 30 篇" },
+            { "年度": 2024, "頁碼": 2, "報名日期": "2024-07-05 14:45", "主題": "Modern Web", "參賽者名稱": "前端小將", "圖像URL": "https://placehold.co/150x150/003d66/ffffff?text=P4", "題目": "Tailwind CSS 響應式設計指南", "題目簡介": "如何快速打造專業級 UI 介面。", "進度": "已繳交 20 篇" },
+            { "年度": 2024, "頁碼": 3, "報名日期": "2024-07-10 16:30", "主題": "其他", "參賽者名稱": "AI 探索者", "圖像URL": "https://placehold.co/150x150/003d66/ffffff?text=P5", "題目": "Gemini API 應用與實戰", "題目簡介": "建構具備視覺與文本能力的智能應用。", "進度": "已繳交 18 篇" },
+            { "年度": 2024, "頁碼": 3, "報名日期": "2024-07-12 11:00", "主題": "DevOps", "參賽者名稱": "容器達人", "圖像URL": "https://placehold.co/150x150/003d66/ffffff?text=P6", "題目": "Kubernetes 核心概念與實務", "題目簡介": "從 Pod 到 Service 的深度學習。", "進度": "已繳交 5 篇" },
+        ]
+    }
+};
+
+// --- 2. 核心元件 ---
+const App = () => {
+    // 從模擬數據中提取年度資訊
+    const yearKey = Object.keys(MOCK_CONTESTANTS_DATA)[0];
+    const year = MOCK_CONTESTANTS_DATA[yearKey]["參賽者名單_完整列表"][0]?.年度 || 2024;
+    const totalContestants = MOCK_CONTESTANTS_DATA[yearKey]["總參賽人數_所有組別"];
+    
+    // 狀態管理
+    const [contestants, setContestants] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedTheme, setSelectedTheme] = useState('所有組別');
+    const [isLoading, setIsLoading] = useState(true);
+
+    // 模擬數據加載
+    useEffect(() => {
+        // 模擬從您的 JSON 檔案讀取數據
+        setTimeout(() => {
+            const list = MOCK_CONTESTANTS_DATA[yearKey]["參賽者名單_完整列表"];
+            setContestants(list);
+            setIsLoading(false);
+        }, 500);
+    }, [yearKey]);
+
+    // 取得主題組別列表，確保包含「所有組別」
+    const themeOptions = useMemo(() => {
+        const uniqueThemes = new Set(MOCK_CONTESTANTS_DATA[yearKey]["參賽者名單_完整列表"].map(c => c.主題));
+        return ["所有組別", ...Array.from(uniqueThemes)];
+    }, [yearKey]);
+
+    // 篩選與搜尋邏輯
+    const filteredContestants = useMemo(() => {
+        return contestants.filter(contestant => {
+            // 1. 主題篩選
+            const themeMatch = selectedTheme === '所有組別' || contestant.主題 === selectedTheme;
+            
+            // 2. 搜尋詞彙篩選
+            const searchLower = searchTerm.toLowerCase();
+            const searchMatch = 
+                contestant.參賽者名稱.toLowerCase().includes(searchLower) ||
+                contestant.題目.toLowerCase().includes(searchLower) ||
+                contestant.主題.toLowerCase().includes(searchLower);
+
+            return themeMatch && searchMatch;
+        });
+    }, [contestants, searchTerm, selectedTheme]);
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen bg-gray-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-500"></div>
+                <p className="ml-4 text-gray-700">數據載入中...</p>
+            </div>
+        );
+    }
+    
+    return (
+        <div className="min-h-screen bg-gray-50 font-inter">
+            {/* Header */}
+            <header className="bg-white shadow-md p-4 sticky top-0 z-10">
+                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                    <h1 className="text-3xl font-extrabold text-indigo-700 tracking-tight">
+                        iThome 鐵人賽 {year} 參賽名單
+                    </h1>
+                    <div className="mt-2 sm:mt-0 flex items-center text-gray-600">
+                        <Users className="w-5 h-5 mr-1" />
+                        <span className="font-semibold text-lg">
+                            總報名人數: <span className="text-indigo-600">{totalContestants}</span>
+                        </span>
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-7xl mx-auto p-4 sm:p-6">
+                {/* 篩選與搜尋區塊 */}
+                <div className="bg-white p-4 rounded-xl shadow-lg mb-6 flex flex-col md:flex-row gap-4">
+                    {/* 搜尋欄 */}
+                    <div className="relative flex-grow">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="搜尋參賽者、題目或組別..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                        />
+                    </div>
+
+                    {/* 主題篩選下拉選單 */}
+                    <div className="relative md:w-56">
+                        <select
+                            value={selectedTheme}
+                            onChange={(e) => setSelectedTheme(e.target.value)}
+                            className="w-full appearance-none bg-white border border-gray-300 rounded-lg py-2 pl-3 pr-10 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 cursor-pointer"
+                        >
+                            {themeOptions.map(theme => (
+                                <option key={theme} value={theme}>{theme}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* 顯示結果數量 */}
+                <p className="text-gray-600 mb-4 text-sm font-medium">
+                    共找到 {filteredContestants.length} 筆符合篩選條件的記錄。
+                </p>
+
+                {/* --- 3. 響應式表格 (Desktop/Tablet) --- */}
+                <div className="hidden sm:block overflow-x-auto shadow-xl rounded-xl">
+                    <table className="min-w-full divide-y divide-gray-200 bg-white">
+                        <thead className="bg-indigo-600 text-white">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider rounded-tl-xl">主題組別</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">參賽者</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">題目名稱</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">進度</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider rounded-tr-xl">報名日期</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100">
+                            {filteredContestants.map((c, index) => (
+                                <tr key={index} className="hover:bg-indigo-50 transition duration-100">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                            {c.主題}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-900">{c.參賽者名稱}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <a href={c.題目URL || '#'} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition duration-150 truncate max-w-xs block">
+                                            {c.題目}
+                                        </a>
+                                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">{c.題目簡介}</p>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`text-sm font-semibold ${c.進度.includes('30') ? 'text-green-600' : 'text-orange-500'}`}>
+                                            {c.進度}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {c.報名日期.split(' ')[0]}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* --- 4. 卡片列表 (Mobile) --- */}
+                <div className="sm:hidden grid grid-cols-1 gap-4">
+                    {filteredContestants.map((c, index) => (
+                        <div key={index} className="bg-white p-4 rounded-xl shadow-lg border-l-4 border-indigo-500">
+                            <div className="flex justify-between items-start mb-2">
+                                <span className="px-3 py-1 inline-flex text-sm font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                    {c.主題}
+                                </span>
+                                <span className={`text-sm font-bold ${c.進度.includes('30') ? 'text-green-600' : 'text-orange-500'}`}>
+                                    {c.進度}
+                                </span>
+                            </div>
+                            
+                            <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center">
+                                <Users className="w-4 h-4 mr-2 text-indigo-500" />
+                                {c.參賽者名稱}
+                            </h2>
+                            
+                            <p className="text-base text-gray-700 mb-2 font-medium flex items-center">
+                                <BookOpen className="w-4 h-4 mr-2 text-indigo-500" />
+                                <a href={c.題目URL || '#'} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                    {c.題目}
+                                </a>
+                            </p>
+                            
+                            <p className="text-xs text-gray-500 border-t pt-2 mt-2">
+                                報名日期: {c.報名日期.split(' ')[0]}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                {filteredContestants.length === 0 && (
+                    <div className="text-center py-10 text-gray-500">
+                        <Award className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-xl font-semibold">未找到任何記錄。</p>
+                        <p>請嘗試調整您的搜尋關鍵字或篩選組別。</p>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
+export default App;
