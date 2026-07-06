@@ -28,7 +28,7 @@ jobs:
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
-                  python-version: "3.10"
+                  python-version: "3.11"
 
             # 3. 安裝爬蟲所需的依賴 (包含 lxml, pytz, beautifulsoup4, requests)
             # 修正點：補上了 beautifulsoup4 和 requests 確保爬蟲正常運作
