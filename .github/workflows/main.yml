@@ -14,7 +14,7 @@ jobs:
     update-rates:
         runs-on: ubuntu-latest
 
-        # *** 關鍵修正：授予 Action 寫入 (write) 權限，以解決 Permission denied 錯誤 ***
+        # 授予 Action 寫入 (write) 權限，以解決 Permission denied 錯誤
         permissions:
             contents: write
 
@@ -24,29 +24,32 @@ jobs:
               uses: actions/checkout@v4
 
             # 2. 設定 Python 環境
-            # 修正點：將 "3.x" 改為固定的穩定版本 "3.10"，避免被 GitHub 自動升級到未知的最新版導致環境衝突
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
                   python-version: "3.11"
 
-            # 3. 安裝爬蟲所需的依賴 (包含 lxml, pytz, beautifulsoup4, requests)
-            # 修正點：補上了 beautifulsoup4 和 requests 確保爬蟲正常運作
-            - name: Install dependencies (pandas, html5lib, pytz, lxml, beautifulsoup4, requests)
+            # 🌟 新增步驟：在 Linux 伺服器上安裝穩定版 Chrome 瀏覽器，供 Selenium 呼叫
+            - name: Setup Chrome Browser
+              uses: browser-actions/setup-chrome@v1
+              with:
+                  chrome-version: stable
+
+            # 3. 安裝爬蟲所需的依賴 (⚠️ 已補上 selenium 確保瀏覽器自動化正常運作)
+            - name: Install dependencies (pandas, html5lib, pytz, lxml, beautifulsoup4, requests, selenium)
               run: |
                   python -m pip install --upgrade pip
-                  pip install pandas html5lib pytz lxml beautifulsoup4 requests
+                  pip install pandas html5lib pytz lxml beautifulsoup4 requests selenium
 
             # 4. 執行爬蟲程式 (產生 history.json 和 app.log)
             - name: Run Crawler and Generate History Data and Log
-              # 確保這裡的檔案名稱與您實際使用的 Python 檔案名稱一致
               run: python Exhange-Rates-Gemini.py
 
             # 5. 自動提交和推送變更
             - name: Commit and Push new data and log files
               uses: stefanzweifel/git-auto-commit-action@v5
               with:
-                  # *** 最終修正：使用 'data/*' 提交 history.json ***
+                  # 使用 'data/*' 提交 history.json
                   file_pattern: "data/*"
 
                   # 修正提交訊息
